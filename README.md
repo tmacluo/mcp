@@ -1,5 +1,5 @@
 # MCP overview
-## 今天的天气怎么样？
+## 明天上海的天气怎么样？
 LLM本身受限于过时的训练数据无法提供精确的答案
 
 能调用外部工具，是大模型进化为智能体Agent的关键，如果不能使用外部工具，大模型就只能是个简单的聊天机器人，甚至连查询天气都做不到。由于底层技术限制，大模型本身是无法和外部工具直接通信的，因此Function calling的思路，就是创建一个外部函数（function）作为中介，一边传递大模型的请求，另一边调用外部工具，最终让大模型能够间接的调用外部工具。
@@ -7,7 +7,12 @@ LLM本身受限于过时的训练数据无法提供精确的答案
 然而，这种集成需要一种结构良好的方法来处理将提示转换为可操作指令以及这些指令的执行。这时，Function calling 函数调用和模型上下文协议 (MCP) 便应运而生，
 
 ## System prompt
+预设主要用来描述AI的角色、性格、背景知识、语气。可以让LLM根据历史数据来推测天气。
+比如豆包里面集成的AI智能体，用户可以预设System prompt来自己创建智能体。
 
+<img src="https://github.com/user-attachments/assets/13988c33-aae0-4a68-901a-e3103c2efee0" width="570" height="660">
+
+## Tool
 可以预先定义查询天气的函数。
 
 ```mermaid
@@ -16,8 +21,8 @@ LLM本身受限于过时的训练数据无法提供精确的答案
     get_weather()->>AI client: 注册
     AI client->>AI client: 生成System Prompt(工具使用说明书)
     Note right of AI client: get_weather()可以查询天气,如何想使用就返回我要调用+工具名
-    User->>AI client:请问上海的天气怎么样？
-    AI client->>LLM: User Prompt:请问上海的天气怎么样？+ System Prompt
+    User->>AI client:请问明天上海的天气怎么样？
+    AI client->>LLM: User Prompt:请问明天上海的天气怎么样？+ System Prompt
     LLM->>AI client: 我要调用+get_weather()
     AI client->>get_weather(): call get_weather()
     get_weather()-->>AI client: 返回天气结果
@@ -26,7 +31,10 @@ LLM本身受限于过时的训练数据无法提供精确的答案
 ```
 
 我们把AI client这种负责在模型、工具和最终用户之间传话的程序就叫做AI Agent， 而提供给AI调用的函数或者服务就叫做Agent Tool.
-比如豆包里面集成的AI智能体，用户也可以自己创建智能体。
+
+### 缺点
+- LLM是概率模型，返回跟AI client的格式有可能不对
+- System Prompt需要定义LLM的返回格式
 
 ## Funtion callling
 统一格式，规范描述，更加有针对性的训练AI模型理解调用场景
@@ -61,8 +69,9 @@ LLM response：
 
 ### Function call的不足
 - 工具使用说明书（API Schema）写起来比较复杂，协议碎片化，需要为每个模型单独开发适配层
+- 每家大厂的标准不一样，很多开源模型还不支持Function calling
 - 功能扩展难，API schema变化，新增工具需要调整接口
-- 已有的工具无法复用
+- 已有的工具无法复用, 需求：把通用的Tool变成服务统一托管，所有的AI client/Agent都来调用 -> MCP
 
 
 ## MCP
@@ -75,7 +84,7 @@ MCP 是一种 开放标准，它允许开发者 安全地 在 数据源 和 AI �
 - 开发者可以通过 MCP 服务器 公开他们的数据；
 - AI 应用（MCP 客户端） 可以连接到 MCP 服务器，获取所需数据。
 
-### 解决的问题
+### MCP的目标
 <img width="1149" alt="image" src="https://github.com/user-attachments/assets/e6f3f473-f8bd-42a6-ad86-43e4305be5fc" />
 
 MCP的目标，就是能在工具或者Agent开发过程中，让大模型更加便捷的调用外部工具。为此，MCP提出了两个方案。
@@ -198,7 +207,7 @@ def format_alert(feature: dict) -> str:
 ```
 
 🔹 实现工具执行逻辑
-工具执行处理器负责调用具体的工具逻辑。让我们实现 获取天气警报 和 获取天气预报 的方法。
+工具执行处理器负责调用具体的工具逻辑。让我们实现 获取天气警报 和 获取天气预报 的方法。  
 1️⃣ 获取天气警报
 
 ```
@@ -288,4 +297,28 @@ __main__
 
 
 ## A2A
-个人理解A2A和MCP是不同层级维度的扩展。A2A更注重Agent之间的通信和协作，Agent和Agent之间是平等的地位。而MCP更注重以Agent为主体提升其扩展能力。一个是WTO组织，另一个是Type-C接口。
+A2A（Agent2Agent）是一种开放协议，旨在实现不透明Agent之间的通信和互操作。其主要作用就是为不同的Agent提供一种共同的“语言”标准，在它们需要“交流”的时候可以更加简单、高效与安全，实现信息共享与任务分配，从而更快的完成任务，即使它们的底层平台完全不同.
+
+整体上而言，A2A提供的价值与MCP是类似的：
+- 降低异构Agent之间的集成复杂性：你无需了解对端Agent的细节。
+- 提高Agent能力的可复用性：你可以把某个任务交给更擅长它的Agent。
+- 更好的扩展性以适应变化：Agent的内部逻辑变化可以被A2A所隔离。
+
+A2A协议对Agent之间集成的如下方面进行标准化：
+- 集成架构与关键组件
+- 消息与通信机制（JSON-RPC2.0与HTTP）
+- 服务端与客户端的功能规范
+- 安全验证与授权机制
+
+### A2A与MCP什么关系？
+A2A在诞生动机、架构甚至协议方面都与MCP非常相似，但它们之间的关系与区别还是很清楚的：
+MCP解决的是Agent与外部工具/数据之间的集成，是Agent的“内部事务”；A2A解决的是Agent与Agent之间的集成，属于更高层次的集成关系。
+它们之间是可以共存与协作的，比如：
+
+<img width="650" alt="image" src="https://github.com/user-attachments/assets/aa5f30fe-17a7-40b1-92c3-d3e2b5278249" />
+
+在这样的架构中Agent通过MCP使用工具，Agent与Agent之间则通过A2A产生互动与协作。  
+
+我们对两者做个简单的对比：  
+
+<img width="735" alt="image" src="https://github.com/user-attachments/assets/909ca1d2-02aa-4c3e-9cab-30d76405d732" />
