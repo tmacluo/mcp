@@ -1,4 +1,4 @@
-# mcp overview
+# MCP overview
 ## 今天的天气怎么样？
 LLM本身受限于过时的训练数据无法提供精确的答案
 
@@ -11,10 +11,10 @@ LLM本身受限于过时的训练数据无法提供精确的答案
 可以预先定义查询天气的函数。
 
 ```mermaid
-%% Example of sequence diagram
+%% Get weather sequence diagram
   sequenceDiagram
     get_weather()->>AI client: 注册
-    AI client->>AI client: 生成System Prompt
+    AI client->>AI client: 生成System Prompt(工具使用说明书)
     Note right of AI client: get_weather()可以查询天气,如何想使用就返回我要调用+工具名
     User->>AI client:请问上海的天气怎么样？
     AI client->>LLM: User Prompt:请问上海的天气怎么样？+ System Prompt
@@ -26,6 +26,7 @@ LLM本身受限于过时的训练数据无法提供精确的答案
 ```
 
 我们把AI client这种负责在模型、工具和最终用户之间传话的程序就叫做AI Agent， 而提供给AI调用的函数或者服务就叫做Agent Tool.
+比如豆包里面集成的AI智能体，用户也可以自己创建智能体。
 
 ## Funtion callling
 统一格式，规范描述，更加有针对性的训练AI模型理解调用场景
@@ -59,7 +60,8 @@ LLM response：
 
 
 ### Function call的不足
-- 协议碎片化，需要为每个模型单独开发适配层
+- 工具使用说明书（API Schema）写起来比较复杂，协议碎片化，需要为每个模型单独开发适配层
+- 功能扩展难，API schema变化，新增工具需要调整接口
 - 已有的工具无法复用
 
 
@@ -261,20 +263,27 @@ __main__
     mcp.run(transport='stdio')
 ```
 
-#### MCP Request Format
-```
-{
-  "jsonrpc": "2.0",
-  "id": 129
-  "method": "tools/call",
-  "params": {
-    "name": "get_current_stock_price",
-    "arguments": {
-      "company": "AAPL",
-      "format": "USD"
-    }
-  },
-}
+#### MCP Flow
+
+```mermaid
+%% Get weather MCP sequence diagram
+  sequenceDiagram
+    rect rgb(191, 223, 255)
+    AI client->>MCP Server: 启动MCP Server
+    AI client->>MCP Server: 你好呀，我是AI client
+    MCP Server->>AI client: 你好呀，我是weather MCP
+    AI client->>MCP Server: 你有啥工具啊
+    MCP Server->>AI client: 我有get_forecast和get_alerts
+    end
+    User->>AI client: 上海明天的天气怎么样？
+    AI client->>LLM: 上海明天的天气怎么样？
+    Note right of MCP Server: 我还有一些工具，分别是...
+    LLM->>AI client: 我要调用get_forecast,参数是...
+    AI client->>MCP Server: 我要调用get_forecast,参数是...
+    MCP Server->>AI client: 调用完毕，结果是...
+    AI client->>LLM: 调用完毕，结果是...
+    LLM->>AI client: 上海明天的天气是这样的...
+    AI client->>User: 上海明天的天气是这样的...
 ```
 
 
